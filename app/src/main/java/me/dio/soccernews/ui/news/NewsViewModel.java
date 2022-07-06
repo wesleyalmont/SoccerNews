@@ -1,30 +1,64 @@
 package me.dio.soccernews.ui.news;
 
+import android.os.AsyncTask;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import java.util.ArrayList;
 import java.util.List;
 
+import me.dio.soccernews.data.SoccerNewsRepository;
 import me.dio.soccernews.domain.News;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class NewsViewModel extends ViewModel {
 
-    private final MutableLiveData<List<News>> news;
+    public enum State {
+        DOING, DONE, ERROR;
+    }
+
+    private final MutableLiveData<List<News>> news = new MutableLiveData<>();
+    private final MutableLiveData<State> state = new MutableLiveData<>();
+
 
     public NewsViewModel() {
-        // TODO Remover Mock de Noticias
-        news = new MutableLiveData<>();
-        List<News> news = new ArrayList<>();
-        news.add(new News("São Paulo Tem Desfalque Importante.", "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s."));
-        news.add(new News("São Paulo Joga Sábado.", "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, "));
-        news.add(new News("Copa do Mundo Feminino Está Terminando", "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, "));
 
-        this.news.setValue(news);
+        this.findNews();
+    }
+
+    public void findNews() {
+        state.setValue(State.DOING);
+        SoccerNewsRepository.getInstance().getRemoteAPI().getNews().enqueue(new Callback<List<News>>() {
+            @Override
+            public void onResponse(Call<List<News>> call, Response<List<News>> response) {
+                if (response.isSuccessful()) {
+                    news.setValue(response.body());
+                    state.setValue(State.DONE);
+                } else {
+                    state.setValue(State.ERROR);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<List<News>> call, Throwable t) {
+                t.printStackTrace();
+                state.setValue(State.ERROR);
+            }
+        });
     }
 
     public LiveData<List<News>> getNews() {
-        return news;
+        return this.news;
+    }
+
+    public LiveData<State> getState() {
+        return this.state;
+    }
+
+    public void saveNews(News news){
+        AsyncTask.execute(() -> SoccerNewsRepository.getInstance().getLocalDb().newsDao().save(news));
     }
 }
